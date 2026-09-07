@@ -11,7 +11,9 @@
     "db:push": "supabase db push",
     "db:reset": "supabase db reset",
     "seed": "tsx scripts/seed.ts",
-    "test": "node --test --experimental-strip-types tests/*.test.ts"
+    "test": "tsx --test tests/*.test.ts",
+    "test:db": "./scripts/test-db.sh",
+    "check:bundle": "./scripts/check-bundle.sh"
   },
   "dependencies": {
     "@fontsource/inter": "5.1.0",

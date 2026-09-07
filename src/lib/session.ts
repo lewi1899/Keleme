@@ -105,17 +105,7 @@ export async function requireAdmin() {
   return context;
 }
 
-/**
- * Grade 12 reaches the whole 9–12 catalogue; every other grade sees only its
- * own year. Mirrors `public.grade_can_access` — the database is still the
- * enforcement point, this is for rendering decisions.
- */
-export function gradeCanAccess(viewerGrade: number, contentGrade: number): boolean {
-  if (viewerGrade === 12) return contentGrade >= 9 && contentGrade <= 12;
-  return viewerGrade === contentGrade;
-}
-
-/** Grades a student may browse, most relevant first. */
-export function accessibleGrades(viewerGrade: number): number[] {
-  return viewerGrade === 12 ? [12, 11, 10, 9] : [viewerGrade];
-}
+// The pure grade rules live in `@/lib/grades` so client components can import
+// them without pulling in this server-only module, and so they can be unit
+// tested. Re-exported here because most callers already have the session.
+export { gradeCanAccess, accessibleGrades } from "@/lib/grades";
