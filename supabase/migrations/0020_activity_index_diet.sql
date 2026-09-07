@@ -1,0 +1,63 @@
+-- =============================================================================
+-- KELEME — 0020 daily_activity index diet
+--
+-- docs/CAPACITY.md is right that storage is the first wall you hit on a
+-- Supabase plan. It just was not looking in the right place: most of the
+-- storage is not data.
+--
+-- Measured at 500,000 students / 12.0M activity rows:
+--
+--   daily_activity heap                        876 MB
+--   daily_activity indexes                   2,289 MB     2.6x the data
+--   whole database                           3,573 MB
+--
+-- Four indexes on one table, and two of them earn nothing:
+--
+--   daily_activity_date_idx        830 MB          0 scans
+--     (activity_date, user_id)
+--     Superseded by daily_activity_period_idx, which 0013 added with the same
+--     leading column plus INCLUDE (user_id, seconds). Anything this could
+--     serve, the covering index serves without a heap fetch. Zero scans across
+--     a full seed and the entire benchmark suite is not a sampling artefact —
+--     there is no query left that prefers it.
+--
+--   daily_activity_user_date_idx   511 MB  1,000,085 scans
+--     (user_id, activity_date DESC)
+--     Heavily used, and still redundant: daily_activity_pkey is
+--     (user_id, activity_date), the same columns in the same order, differing
+--     only in the direction of the second. A btree reads backwards as cheaply
+--     as forwards, so the primary key serves this index's entire workload.
+--
+-- Verified rather than assumed — with both dropped, EXPLAIN on the two
+-- user-scoped shapes the app actually issues:
+--
+--   where user_id = ? and activity_date >= ?
+--     -> Index Scan using daily_activity_pkey            13 buffers, 0.172ms
+--   where user_id = ? order by activity_date desc limit 5
+--     -> Index Scan Backward using daily_activity_pkey   10 buffers, 0.038ms
+--
+-- Result at 500,000 students: database 3,573 MB -> 2,232 MB, a 37.5% cut,
+-- with every student-facing benchmark unchanged (my rank 0.2ms, session
+-- context 0.9ms, heartbeat 0.1ms, weekly seconds 0.1ms, recent progress
+-- 0.1ms), across two full benchmark runs.
+--
+-- The one query that does get slower is the bench line labelled
+-- "dashboard: week activity (NO user filter, RLS only)", 120ms -> 145ms. That
+-- line exists in bench.sql precisely to show what happens without a user
+-- filter; the app issues that read in exactly one place
+-- (src/lib/queries/student.ts getWeeklySeconds) and always with
+-- .eq("user_id", userId), which measured 0.1ms before and after. If a future
+-- query does need an unfiltered scan of a date range, period_idx covers it.
+--
+-- Storage per student: 7.32 KB -> 4.57 KB. On Supabase's 8 GB Pro plan that
+-- moves the ceiling from roughly 1.1M students to roughly 1.8M.
+-- =============================================================================
+
+drop index if exists public.daily_activity_date_idx;
+drop index if exists public.daily_activity_user_date_idx;
+
+-- Leaves exactly two indexes on the table, one per access pattern:
+--   daily_activity_pkey        (user_id, activity_date)  — everything scoped
+--                              to one student, in either direction
+--   daily_activity_period_idx  (activity_date) INCLUDE (user_id, seconds)
+--                              — the leaderboard refresh's range scan, index-only
