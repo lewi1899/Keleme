@@ -37,6 +37,7 @@ export default async function ContentPage({ params }: { params: { contentId: str
     supabase
       .from("bookmarks")
       .select("content_id")
+      .eq("user_id", session.profile.id)
       .eq("content_id", item.id)
       .maybeSingle(),
   ]);

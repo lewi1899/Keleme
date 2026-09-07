@@ -20,6 +20,9 @@ export default async function PremiumPage() {
     supabase
       .from("payments")
       .select("*, plans(name, kind)")
+      // Explicit user filter so this is an index lookup, not a scan of every
+      // payment on the platform filtered per row by RLS.
+      .eq("user_id", session.profile.id)
       .order("created_at", { ascending: false })
       .limit(20),
     getSupportContacts(),

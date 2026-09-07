@@ -886,6 +886,126 @@ end $$;
 rollback;
 
 -- =============================================================================
+-- 13. Owned-row defaults (regression: bookmarking was broken)
+--
+-- bookmarks.user_id is NOT NULL and the client sends only content_id, so
+-- without a default of auth.uid() every insert failed the WITH CHECK and the
+-- Save button silently reverted. These assert both halves: the honest insert
+-- works, and the column cannot be used to write someone else's row.
+-- =============================================================================
+
+\echo '== 13. Owned-row defaults =='
+
+reset role;
+begin;
+
+set role authenticated;
+select public._as('00000000-0000-0000-0000-000000000009');
+
+do $$
+declare v_content uuid; v_owner uuid;
+begin
+  select id into v_content from public.content_items
+  where id = '00000000-0000-0000-0000-0000000c0901';
+
+  -- Exactly what the bookmark button sends: content_id and nothing else.
+  insert into public.bookmarks (content_id) values (v_content);
+
+  select user_id into v_owner from public.bookmarks where content_id = v_content;
+  perform public._assert(v_owner = '00000000-0000-0000-0000-000000000009',
+    'a bookmark inserted without user_id is attributed to the caller');
+end $$;
+
+-- The default must not become a way to write rows for other people.
+do $$
+begin
+  perform public._assert_write_blocked(
+    $s$insert into public.bookmarks (user_id, content_id)
+       values ('00000000-0000-0000-0000-000000000012',
+               '00000000-0000-0000-0000-0000000c1001')$s$,
+    'a student must not be able to create a bookmark owned by someone else');
+end $$;
+
+-- content_progress carries the same default for the same reason.
+do $$
+declare v_owner uuid;
+begin
+  insert into public.content_progress (content_id)
+  values ('00000000-0000-0000-0000-0000000c0901')
+  on conflict do nothing;
+
+  select user_id into v_owner from public.content_progress
+  where content_id = '00000000-0000-0000-0000-0000000c0901';
+  perform public._assert(v_owner = '00000000-0000-0000-0000-000000000009',
+    'content progress inserted without user_id is attributed to the caller');
+end $$;
+
+reset role;
+rollback;
+
+-- =============================================================================
+-- 14. admin_search_students builds SQL — prove it cannot be injected
+--
+-- The entitlement filters are assembled as SQL text rather than chosen by a
+-- CASE, because a CASE stops the planner using a semi-join (measured 171ms vs
+-- 20ms at 100k profiles). That makes injection safety a property worth
+-- asserting rather than assuming: the predicate comes from a fixed set of
+-- literals, and every caller-supplied value is a bound parameter.
+-- =============================================================================
+
+\echo '== 14. Admin search injection =='
+
+reset role;
+begin;
+
+set role authenticated;
+select public._as('00000000-0000-0000-0000-00000000ad11');   -- the admin fixture
+
+do $$
+declare v_result jsonb;
+begin
+  -- A classic terminator in the search box.
+  v_result := public.admin_search_students($q$'; drop table public.plans; --$q$, null, 'all', 25, 0);
+  perform public._assert(v_result ? 'total', 'a quote-terminator search still returns a normal result');
+
+  -- A wildcard-and-tautology attempt.
+  v_result := public.admin_search_students($q$%' or 1=1 --$q$, null, 'all', 25, 0);
+  perform public._assert(v_result ? 'total', 'a tautology attempt still returns a normal result');
+
+  -- An unknown filter must fall through to "no extra predicate", never inject.
+  v_result := public.admin_search_students(null, null, $q$premium'); drop table public.plans; --$q$, 25, 0);
+  perform public._assert(v_result ? 'total', 'an unknown filter is ignored rather than executed');
+end $$;
+
+reset role;
+
+-- The tables the payloads targeted are still there.
+select public._assert(
+  (select count(*) from public.plans) >= 8,
+  'the plans table survived every injection attempt');
+select public._assert(
+  to_regclass('public.profiles') is not null,
+  'the profiles table survived every injection attempt');
+
+-- And the filters still return the right answers.
+do $$
+declare v_premium jsonb; v_all jsonb;
+begin
+  perform set_config('request.jwt.claims',
+    json_build_object('sub', '00000000-0000-0000-0000-00000000ad11', 'role', 'authenticated')::text, false);
+  set local role authenticated;
+
+  v_all := public.admin_search_students(null, null, 'all', 5, 0);
+  v_premium := public.admin_search_students(null, null, 'premium', 5, 0);
+
+  perform public._assert((v_all ->> 'total')::bigint >= (v_premium ->> 'total')::bigint,
+    'the premium filter returns a subset of all students');
+end $$;
+
+reset role;
+rollback;
+
+-- =============================================================================
 -- Cleanup
 -- =============================================================================
 

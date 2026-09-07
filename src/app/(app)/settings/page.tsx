@@ -21,6 +21,7 @@ export default async function SettingsPage() {
     supabase
       .from("user_sessions")
       .select("id, device_label, user_agent, created_at, last_seen_at, revoked_at")
+      .eq("user_id", session.profile.id)
       .is("revoked_at", null)
       .order("last_seen_at", { ascending: false })
       .limit(10),

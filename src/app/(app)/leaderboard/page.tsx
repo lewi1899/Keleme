@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Crown, Eye, EyeOff, Flame, Info, Medal, Trophy } from "lucide-react";
 import { requireUser } from "@/lib/session";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { getCachedLeaderboard } from "@/lib/queries/leaderboard";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
@@ -27,12 +28,21 @@ export default async function LeaderboardPage({ searchParams }: { searchParams: 
     : "weekly";
 
   const supabase = createSupabaseServerClient();
-  const [{ data: rows }, { data: myRank }] = await Promise.all([
-    supabase.rpc("get_leaderboard", { p_scope: scope, p_limit: 50, p_offset: 0 }),
+
+  // The ranking is shared and cached for a minute (see queries/leaderboard.ts —
+  // it was the app's only throughput bottleneck). "Your position" stays live
+  // and per-user, because that is the part a student actually watches.
+  const [cachedRows, { data: myRank }] = await Promise.all([
+    getCachedLeaderboard(scope, 50),
     supabase.rpc("get_my_rank", { p_scope: scope }),
   ]);
 
-  const entries = (rows ?? []) as LeaderboardRow[];
+  // is_me is derived here rather than in the cached payload, so one copy of
+  // the ranking is correct for every viewer.
+  const entries: LeaderboardRow[] = cachedRows.map((row) => ({
+    ...row,
+    is_me: row.user_id === session.profile.id,
+  }));
   const mine = myRank as { rank: number | null; seconds: number; streak: number } | null;
   const podium = entries.slice(0, 3);
   const rest = entries.slice(3);

@@ -14,7 +14,8 @@
     "test": "tsx --test tests/*.test.ts",
     "test:db": "./scripts/test-db.sh",
     "check:bundle": "./scripts/check-bundle.sh",
-    "smoke": "node scripts/smoke.mjs"
+    "smoke": "node scripts/smoke.mjs",
+    "loadtest": "./scripts/loadtest/run.sh"
   },
   "dependencies": {
     "@fontsource/inter": "5.1.0",

@@ -123,6 +123,7 @@ Open <http://localhost:3000>.
 | `npm run test:db` | **Migrations + the RLS suite** against a scratch database |
 | `npm run check:bundle` | Verify no server-only secret reached the client bundle |
 | `npm run smoke` | Load the public pages in a real browser across themes; fails on any console error |
+| `npm run loadtest` | Seed 100k students and benchmark every hot query (see docs/CAPACITY.md) |
 | `npm run seed` | Create the administrator accounts |
 
 ---
@@ -342,6 +343,7 @@ pays out before anyone looks at it.
 | Document | Covers |
 |---|---|
 | [TESTING.md](TESTING.md) | **Start here** — testing this on your own computer, with a 15-minute walkthrough |
+| [docs/CAPACITY.md](docs/CAPACITY.md) | How many users it handles — measured against 100,000 students, with the load-test method |
 | [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) | Production deployment and the launch checklist |
 | [docs/SECURITY.md](docs/SECURITY.md) | The security model, and an honest account of what content protection can and cannot do |
 | [docs/PAYMENTS.md](docs/PAYMENTS.md) | How payments work today and what integrating a provider involves |
