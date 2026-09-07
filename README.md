@@ -344,6 +344,7 @@ pays out before anyone looks at it.
 |---|---|
 | [TESTING.md](TESTING.md) | **Start here** — testing this on your own computer, with a 15-minute walkthrough |
 | [docs/CAPACITY.md](docs/CAPACITY.md) | How many users it handles — measured against 100,000 students, with the load-test method |
+| [docs/NEXT-SESSION-PROMPT.md](docs/NEXT-SESSION-PROMPT.md) | A ready-to-paste prompt for the next scale/speed/roadmap review |
 | [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) | Production deployment and the launch checklist |
 | [docs/SECURITY.md](docs/SECURITY.md) | The security model, and an honest account of what content protection can and cannot do |
 | [docs/PAYMENTS.md](docs/PAYMENTS.md) | How payments work today and what integrating a provider involves |
