@@ -118,6 +118,7 @@ Open <http://localhost:3000>.
 | `npm test` | Unit tests (pure logic) |
 | `npm run test:db` | **Migrations + the RLS suite** against a scratch database |
 | `npm run check:bundle` | Verify no server-only secret reached the client bundle |
+| `npm run smoke` | Load the public pages in a real browser across themes; fails on any console error |
 | `npm run seed` | Create the administrator accounts |
 
 ---
@@ -252,6 +253,9 @@ npm run lint      # eslint
 npm run test:db   # migrations + 12-section RLS suite
 
 npm run build && npm run check:bundle   # no service-role key in the browser
+
+# With the app running (npm start or npm run dev):
+npm run smoke     # 9 page/theme combinations in a real browser, screenshots to /tmp
 ```
 
 ### The RLS suite is the important one

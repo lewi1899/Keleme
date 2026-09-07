@@ -105,6 +105,9 @@ npm test            # 25 unit tests pass
 npm run test:db     # 12 RLS sections pass
 npm run build       # succeeds
 npm run check:bundle # no server-only secret reached the client bundle
+
+npm start &          # then, against the running build:
+npm run smoke        # 9 page/theme combinations render with no console error
 ```
 
 ### Verify in the browser, against production
@@ -163,7 +166,7 @@ Admin:
 Operational:
 
 - [ ] Test on a real phone on mobile data, not just a desktop browser
-- [ ] Check all six themes, including the three dark ones
+- [ ] Check all six themes, including the three dark ones (`npm run smoke` covers the public pages)
 - [ ] No secrets in the client bundle — `npm run check:bundle` passes after a production build
 - [ ] The browser console is clean on the dashboard and the content viewer
 
