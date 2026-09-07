@@ -138,11 +138,44 @@ export async function getWeeklySeconds(): Promise<{ week: number; today: number 
   );
 }
 
-export async function getMyRank(scope: "weekly" | "monthly" | "all" = "weekly") {
+export interface MyRank {
+  rank: number | null;
+  seconds: number;
+  streak: number;
+  /**
+   * True when the rank came from the sampled distribution rather than the
+   * exact head of the board (migration 0019). Accurate to within one bucket —
+   * measured at worst 919 positions out of 242,023 ranked at 500k students.
+   * The UI shows a percentile instead of a false-precision ordinal for these.
+   */
+  approximate: boolean;
+  /** 1 = top of the board. Null when the student is not ranked at all. */
+  percentile: number | null;
+  /** How many students are ranked in this scope at all. */
+  rankedTotal: number;
+}
+
+export async function getMyRank(scope: "weekly" | "monthly" | "all" = "weekly"): Promise<MyRank> {
   const supabase = createSupabaseServerClient();
   const { data, error } = await supabase.rpc("get_my_rank", { p_scope: scope });
-  if (error || !data) return { rank: null as number | null, seconds: 0, streak: 0 };
-  return data as { rank: number | null; seconds: number; streak: number };
+
+  const empty: MyRank = {
+    rank: null, seconds: 0, streak: 0, approximate: false, percentile: null, rankedTotal: 0,
+  };
+  if (error || !data) return empty;
+
+  // `approximate`, `percentile` and `ranked_total` were added in 0019. Reading
+  // them defensively means a deployment whose database has not been migrated
+  // yet renders an exact-looking rank rather than crashing on undefined.
+  const row = data as Record<string, unknown>;
+  return {
+    rank: (row.rank as number | null) ?? null,
+    seconds: (row.seconds as number) ?? 0,
+    streak: (row.streak as number) ?? 0,
+    approximate: Boolean(row.approximate),
+    percentile: (row.percentile as number | null) ?? null,
+    rankedTotal: (row.ranked_total as number) ?? 0,
+  };
 }
 
 export async function getLiveAnnouncements(limit = 3): Promise<Announcement[]> {

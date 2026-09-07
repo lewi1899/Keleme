@@ -575,6 +575,68 @@ begin
     format('the leaderboard projection must expose no contact or identity fields, got: %s', v_sig));
 end $$;
 
+-- ---------------------------------------------------------------------------
+-- 0019 added three summary tables behind get_leaderboard/get_my_rank. They are
+-- reachable only through those security-definer functions: RLS is on with no
+-- policy at all, which denies everyone who is not a superuser. Assert that
+-- directly, because "no policy" is easy to undo by adding a permissive one
+-- later, and a readable leaderboard_top would expose the ranking of students
+-- who never opted in.
+-- ---------------------------------------------------------------------------
+set role authenticated;
+select public._as('00000000-0000-0000-0000-000000000009');
+
+do $$
+declare t text; v_leaked boolean;
+begin
+  foreach t in array array['leaderboard_top', 'leaderboard_dist', 'leaderboard_refresh'] loop
+    begin
+      execute format('select true from public.%I limit 1', t) into v_leaked;
+      -- RLS with no policy returns zero rows rather than raising, so an empty
+      -- result is the pass. A row coming back means a policy was added.
+      perform public._assert(v_leaked is null,
+        format('%s must not be directly readable by an authenticated student', t));
+    exception when insufficient_privilege then
+      null;  -- REVOKE also acceptable, and stronger.
+    end;
+  end loop;
+end $$;
+
+-- The summary path must anonymise exactly as the live path does. Refresh, then
+-- re-run the same assertion against a board now served from leaderboard_top.
+reset role;
+select public.refresh_leaderboard('all');
+
+set role authenticated;
+select public._as('00000000-0000-0000-0000-000000000009');
+
+do $$
+declare r record; v_found boolean := false;
+begin
+  for r in select * from public.get_leaderboard('all', 50, 0) loop
+    if r.user_id = '00000000-0000-0000-0000-000000000010' then
+      v_found := true;
+      perform public._assert(r.is_anonymous,
+        'a non-opted-in student stays anonymous when the board is served from the summary');
+      perform public._assert(r.display_name like 'Student #%',
+        format('summary-served rows use the Student #NNNN form, got %s', r.display_name));
+    end if;
+  end loop;
+  perform public._assert(v_found, 'the summary-served board still ranks non-opted-in students');
+end $$;
+
+-- get_my_rank must never report an exact rank it did not compute exactly.
+do $$
+declare j jsonb;
+begin
+  j := public.get_my_rank('all');
+  perform public._assert(j ? 'approximate', 'get_my_rank reports whether the rank is approximate');
+  perform public._assert(j ? 'ranked_total', 'get_my_rank reports the ranked population');
+  perform public._assert(
+    (j->>'approximate')::boolean = false,
+    'a student inside the exact head of the board must get an exact rank');
+end $$;
+
 -- =============================================================================
 -- 9. Referrals (spec section 15)
 -- =============================================================================

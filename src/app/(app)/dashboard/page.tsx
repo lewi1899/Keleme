@@ -127,11 +127,29 @@ export default async function DashboardPage() {
           index={2}
         />
 
+        {/* Below the exact head of the board the rank is derived from a sampled
+            distribution (migration 0019), so showing "199,651st" would be false
+            precision — the true position is within about a thousand of it. A
+            percentile is both honest and the more motivating number down there:
+            "Top 18%" reads as progress in a way that a six-digit ordinal never
+            does. */}
         <StatCard
           icon={<Trophy size={17} />}
           label="Weekly rank"
-          value={rank.rank ? ordinal(rank.rank) : "Unranked"}
-          hint={rank.rank ? "Top ten win prizes" : "Study this week to be ranked"}
+          value={
+            rank.rank === null
+              ? "Unranked"
+              : rank.approximate && rank.percentile !== null
+              ? `Top ${rank.percentile}%`
+              : ordinal(rank.rank)
+          }
+          hint={
+            rank.rank === null
+              ? "Study this week to be ranked"
+              : rank.approximate && rank.rankedTotal > 0
+              ? `of ${rank.rankedTotal.toLocaleString()} studying this week`
+              : "Top ten win prizes"
+          }
           index={3}
           href="/leaderboard"
         />
