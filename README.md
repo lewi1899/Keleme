@@ -9,6 +9,10 @@ Storage, and Row Level Security.
 
 ---
 
+> **Want to try it right now?** [TESTING.md](TESTING.md) walks you through
+> verifying everything on your own machine — including a ten-minute path that
+> needs no accounts at all.
+
 ## Contents
 
 - [Architecture](#architecture)
@@ -337,6 +341,7 @@ pays out before anyone looks at it.
 
 | Document | Covers |
 |---|---|
+| [TESTING.md](TESTING.md) | **Start here** — testing this on your own computer, with a 15-minute walkthrough |
 | [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) | Production deployment and the launch checklist |
 | [docs/SECURITY.md](docs/SECURITY.md) | The security model, and an honest account of what content protection can and cannot do |
 | [docs/PAYMENTS.md](docs/PAYMENTS.md) | How payments work today and what integrating a provider involves |
