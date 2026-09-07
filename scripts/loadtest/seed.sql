@@ -82,6 +82,42 @@ join public.schools s on s.id = (
 \echo 'Students inserted.'
 
 -- ---------------------------------------------------------------------------
+-- One staff account.
+--
+-- bench.sql authenticates as this UUID to time the admin paths. Without the
+-- row, is_staff() is false, admin_dashboard_metrics() raises 'forbidden', and
+-- because psql runs the bench under ON_ERROR_STOP=1 the script aborts there —
+-- taking the last five benchmarks with it. That was silent: the run still
+-- printed every student-path table above it and exited 0 via the pipeline, so
+-- the admin numbers looked absent rather than failed.
+-- ---------------------------------------------------------------------------
+insert into auth.users (id, email, raw_user_meta_data)
+values ('00000000-0000-0000-0000-0000000000a1'::uuid, 'admin@load.test', '{}'::jsonb);
+
+insert into public.profiles (
+  id, full_name, phone, email, grade, school_id, school_name, role,
+  leaderboard_opt_in, referral_code, timezone, created_at
+)
+select
+  '00000000-0000-0000-0000-0000000000a1'::uuid,
+  'Load Test Admin',
+  -- NOT a '+2519...' number: students take '+2519' || lpad(i, 8, '0'), so
+  -- student 1 already owns +251900000001 and profiles_phone_key is unique.
+  '+251111000001',
+  'admin@load.test',
+  12::smallint,
+  s.id,
+  s.name,
+  'admin',
+  false,
+  'LADMIN0',
+  'Africa/Addis_Ababa',
+  now()
+from public.schools s
+order by s.id
+limit 1;
+
+-- ---------------------------------------------------------------------------
 -- Units and content
 --
 -- 10,000 published items — a far larger catalogue than launch, on purpose:

@@ -37,8 +37,21 @@ echo "==> Seeding $STUDENTS students (this takes a few minutes)"
 
 echo ""
 echo "==> Benchmarking hot queries"
-"${TARGET[@]}" -f scripts/loadtest/bench.sql 2>&1 \
-  | grep -vE "^(CREATE|SET|NOTICE)" || true
+# The exit status of `psql | grep` is grep's, and a trailing `|| true` discards
+# even that — which is how a hard psql error (ON_ERROR_STOP aborting the script
+# partway) previously looked identical to a clean run. Capture psql's own
+# status and fail loudly on it.
+#
+# The `|| bench_status=$?` is load-bearing: under `set -e` a bare failing
+# assignment exits the script before the next line can read `$?`.
+bench_status=0
+bench_output="$("${TARGET[@]}" -f scripts/loadtest/bench.sql 2>&1)" || bench_status=$?
+printf '%s\n' "$bench_output" | grep -vE "^(CREATE|SET|NOTICE)" || true
+if [[ $bench_status -ne 0 ]]; then
+  echo ""
+  echo "!! bench.sql failed (psql exit $bench_status) — the numbers above are incomplete."
+  exit "$bench_status"
+fi
 
 cat <<'NOTE'
 
