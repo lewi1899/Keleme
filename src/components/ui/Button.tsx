@@ -8,7 +8,7 @@ type Variant = "primary" | "secondary" | "ghost" | "danger" | "success";
 type Size = "sm" | "md" | "lg";
 
 const VARIANTS: Record<Variant, string> = {
-  // `--accent-contrast` rather than a hard-coded white: three of the six themes
+  // `--accent-contrast` rather than a hard-coded white: six of the fourteen themes
   // have a light accent, and white-on-light was unreadable in the original.
   primary:
     "bg-accent text-[var(--accent-contrast)] hover:brightness-110 shadow-kl-card disabled:hover:brightness-100",

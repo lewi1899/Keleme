@@ -26,8 +26,8 @@ import type { ActivityPoint } from "@/app/admin/analytics/page";
  * would add colour that means nothing.
  *
  * Colours come from CSS custom properties rather than hex literals, so the
- * charts re-theme instantly with the rest of the app across all six themes and
- * never sit on a mismatched blue in the green or purple themes.
+ * charts re-theme instantly with the rest of the app across all fourteen themes
+ * and never sit on a mismatched blue in the green or purple ones.
  *
  * ACCESSIBILITY: the Sunset Orange theme's accent measures 2.8:1 against its
  * white surface — under the 3:1 floor for a chart mark. The table view below

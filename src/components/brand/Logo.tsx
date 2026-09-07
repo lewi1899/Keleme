@@ -3,7 +3,7 @@ import clsx from "clsx";
 /**
  * The KELEME mark. Kept as a component rather than an image asset so it
  * inherits the active theme's accent colour — the logo changes with the theme
- * instead of sitting on a mismatched blue square in the five non-blue themes.
+ * instead of sitting on a mismatched blue square in the non-blue themes.
  */
 export function Logo({
   size = "md",
