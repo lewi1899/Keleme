@@ -785,6 +785,107 @@ reset role;
 rollback;
 
 -- =============================================================================
+-- 12. Payments and entitlements (spec section 28)
+-- =============================================================================
+
+\echo '== 12. Payments =='
+
+reset role;
+begin;
+
+set role authenticated;
+select public._as('00000000-0000-0000-0000-000000000009');
+
+-- The amount is read from the plan, never from the request, so a student
+-- cannot ask to buy a year of Premium for 1 birr.
+do $$
+declare v_req jsonb; v_amount numeric; v_plan_price numeric;
+begin
+  v_req := public.request_plan((select id from public.plans where slug = 'standard-12m'));
+  perform public._assert(v_req ->> 'payment_id' is not null, 'requesting a plan creates a payment');
+
+  select amount into v_amount from public.payments where id = (v_req ->> 'payment_id')::uuid;
+  select price into v_plan_price from public.plans where slug = 'standard-12m';
+  perform public._assert(v_amount = v_plan_price,
+    'the payment amount comes from the plan row, not from the client');
+
+  -- A pending payment grants nothing. Access follows the entitlement, and the
+  -- entitlement follows confirmation.
+  perform public._assert(
+    (select status from public.payments where id = (v_req ->> 'payment_id')::uuid) = 'pending',
+    'a new request starts pending');
+end $$;
+
+-- Repeated taps reuse the outstanding request rather than piling up rows.
+do $$
+declare v_a jsonb; v_b jsonb; v_count integer;
+begin
+  v_a := public.request_plan((select id from public.plans where slug = 'standard-1m'));
+  v_b := public.request_plan((select id from public.plans where slug = 'standard-1m'));
+  perform public._assert(v_a ->> 'payment_id' = v_b ->> 'payment_id',
+    'a second request for the same plan reuses the pending one');
+  perform public._assert((v_b ->> 'reused')::boolean, 'and says so');
+end $$;
+
+-- A student must not be able to confirm their own payment.
+do $$
+begin
+  perform public.confirm_payment(
+    (select id from public.payments where user_id = auth.uid() limit 1), 'forged');
+  raise exception 'ASSERTION FAILED: a student confirmed their own payment';
+exception
+  when insufficient_privilege then null;
+end $$;
+
+do $$
+begin
+  perform public.admin_confirm_payment(
+    (select id from public.payments where user_id = auth.uid() limit 1), 'forged');
+  raise exception 'ASSERTION FAILED: a student called the admin confirmation function';
+exception
+  when insufficient_privilege then null;
+end $$;
+
+-- The matric package is a grade 12 product; selling it to grade 9 would take
+-- money for something unusable.
+do $$
+declare v_msg text;
+begin
+  perform public.request_plan((select id from public.plans where slug = 'matric-1m'));
+  raise exception 'ASSERTION FAILED: a grade 9 student was sold the matric package';
+exception
+  when sqlstate 'P0001' then
+    get stacked diagnostics v_msg = message_text;
+    if v_msg <> 'matric_plan_requires_grade_12' then raise; end if;
+end $$;
+
+reset role;
+
+-- Confirmation is what creates access, and it is idempotent — the property
+-- that makes a replayed provider webhook harmless.
+do $$
+declare v_payment uuid; v_first uuid; v_second uuid; v_count integer;
+begin
+  select id into v_payment from public.payments
+  where user_id = '00000000-0000-0000-0000-000000000009' and status = 'pending'
+  order by amount desc limit 1;
+
+  v_first := public.confirm_payment(v_payment, 'REF-1');
+  perform public._assert(v_first is not null, 'confirming a payment grants an entitlement');
+  perform public._assert(
+    public.has_active_entitlement('premium', '00000000-0000-0000-0000-000000000009'),
+    'the student is premium once the payment is confirmed');
+
+  v_second := public.confirm_payment(v_payment, 'REF-1');
+  perform public._assert(v_first = v_second, 'replaying confirmation returns the same entitlement');
+
+  select count(*) into v_count from public.user_entitlements where payment_id = v_payment;
+  perform public._assert(v_count = 1, 'replaying confirmation must not grant a second entitlement');
+end $$;
+
+rollback;
+
+-- =============================================================================
 -- Cleanup
 -- =============================================================================
 

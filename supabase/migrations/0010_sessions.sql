@@ -171,3 +171,46 @@ grant execute on function public.on_sign_in(text, text, text) to authenticated;
 grant execute on function public.validate_device_session(text) to authenticated;
 grant execute on function public.end_device_session(text) to authenticated;
 grant execute on function public.get_session_context(text) to authenticated;
+
+-- ---------------------------------------------------------------------------
+-- "Sign out everywhere else"
+--
+-- Revokes every session for the caller except the one making the request. A
+-- student who suspects their password is known needs this to take effect
+-- immediately, without signing themselves out in the process.
+-- ---------------------------------------------------------------------------
+
+create or replace function public.sign_out_other_devices()
+returns integer
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+declare
+  v_keep uuid;
+  v_count integer;
+begin
+  if auth.uid() is null then
+    raise exception 'not_authenticated' using errcode = '42501';
+  end if;
+
+  -- Keep the most recently seen session: the one asking, since it just made a
+  -- request. Anything else is another device.
+  select id into v_keep
+  from public.user_sessions
+  where user_id = auth.uid() and revoked_at is null
+  order by last_seen_at desc
+  limit 1;
+
+  update public.user_sessions
+  set revoked_at = now(), revoked_reason = 'signed_out_other_devices'
+  where user_id = auth.uid()
+    and revoked_at is null
+    and id is distinct from v_keep;
+
+  get diagnostics v_count = row_count;
+  return v_count;
+end;
+$$;
+
+grant execute on function public.sign_out_other_devices() to authenticated;
