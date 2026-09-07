@@ -722,6 +722,69 @@ reset role;
 rollback;
 
 -- =============================================================================
+-- 11. Single active session (spec section 21)
+-- =============================================================================
+
+\echo '== 11. Single session =='
+
+reset role;
+begin;
+
+set role authenticated;
+select public._as('00000000-0000-0000-0000-000000000009');
+
+do $$
+declare v_first jsonb; v_second jsonb;
+begin
+  v_first := public.on_sign_in('hash-phone', 'Mozilla/5.0 (Android)', 'Phone');
+  perform public._assert(v_first ->> 'session_id' is not null, 'signing in registers a device session');
+  perform public._assert(public.validate_device_session('hash-phone'), 'the new session validates');
+
+  -- Signing in on a second device must invalidate the first, not run alongside
+  -- it. This is the whole point of the mechanism: a shared account stops
+  -- working for whoever is not currently signed in.
+  v_second := public.on_sign_in('hash-laptop', 'Mozilla/5.0 (Windows)', 'Laptop');
+  perform public._assert((v_second ->> 'revoked_previous')::integer = 1,
+    'the second sign-in revokes exactly the one previous session');
+  perform public._assert(not public.validate_device_session('hash-phone'),
+    'the first device is signed out once the account is used elsewhere');
+  perform public._assert(public.validate_device_session('hash-laptop'),
+    'the second device is the live one');
+
+  -- Signing out ends it for good.
+  perform public.end_device_session('hash-laptop');
+  perform public._assert(not public.validate_device_session('hash-laptop'),
+    'signing out revokes the session');
+end $$;
+
+-- A forged token belonging to nobody must never validate, and one belonging to
+-- another student must not validate for this caller either.
+do $$
+begin
+  perform public._assert(not public.validate_device_session('not-a-real-token'),
+    'an unknown device token must not validate');
+end $$;
+
+-- The session context must not carry the raw phone number to the client.
+do $$
+declare v_ctx jsonb;
+begin
+  v_ctx := public.get_session_context('hash-laptop');
+  perform public._assert(v_ctx is not null, 'a signed-in student gets a session context');
+  perform public._assert(not (v_ctx -> 'profile' ? 'phone'),
+    'the session context must not include the raw phone number');
+  perform public._assert(v_ctx -> 'profile' ->> 'phone_masked' like '+251 ** *** %',
+    'the phone is surfaced masked, for the student to recognise, not in full');
+  perform public._assert((v_ctx ->> 'ad_level') = 'high',
+    'a student with no paid plan is on the free tier ad level');
+  perform public._assert((v_ctx ->> 'device_valid')::boolean = false,
+    'the context reports a revoked device, which is how the app signs the old phone out');
+end $$;
+
+reset role;
+rollback;
+
+-- =============================================================================
 -- Cleanup
 -- =============================================================================
 
