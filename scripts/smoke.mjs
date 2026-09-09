@@ -48,12 +48,24 @@ const PAGES = [
   { name: "login-desktop", path: "/login", width: 1280, height: 900 },
   { name: "login-mobile", path: "/login", width: 390, height: 900 },
   { name: "register-mobile", path: "/register", width: 390, height: 900 },
-  // One page per dark theme: the three dark palettes are where a hard-coded
-  // colour shows up as unreadable text, and a build will never tell you.
+  // One page per dark theme: a dark palette is where a hard-coded colour shows
+  // up as unreadable text, and a build will never tell you. 0019-era work took
+  // the palette count from six to fourteen, six of them dark — all six are
+  // listed here, because an untested palette is an unshipped one.
   { name: "landing-amoled", path: "/", width: 1280, height: 1000, theme: "amoled-black" },
   { name: "landing-forest", path: "/", width: 1280, height: 1000, theme: "forest-green" },
   { name: "landing-purple", path: "/", width: 1280, height: 1000, theme: "royal-purple" },
+  { name: "landing-midnight", path: "/", width: 1280, height: 1000, theme: "midnight-indigo" },
+  { name: "landing-crimson", path: "/", width: 1280, height: 1000, theme: "crimson-ember" },
+  { name: "landing-mint", path: "/", width: 1280, height: 1000, theme: "cyber-mint" },
+  // And one light page per newly added light palette, on the form-heavy routes
+  // where a low-contrast border or placeholder is easiest to miss.
   { name: "login-sunset", path: "/login", width: 1280, height: 900, theme: "sunset-orange" },
+  { name: "login-rose", path: "/login", width: 1280, height: 900, theme: "rose-quartz" },
+  { name: "login-teal", path: "/login", width: 1280, height: 900, theme: "teal-lagoon" },
+  { name: "register-coffee", path: "/register", width: 390, height: 900, theme: "coffee-cream" },
+  { name: "register-highland", path: "/register", width: 390, height: 900, theme: "highland-green" },
+  { name: "register-sand", path: "/register", width: 390, height: 900, theme: "golden-sand" },
 ];
 
 fs.mkdirSync(OUT, { recursive: true });
